@@ -10,10 +10,10 @@
 #endif
 
 //wifi
-#include <WifiAuth.h>
+#include <WifiAuth.h>                       // define ssid and pass bellow
 //char ssid[] = "mm";                       // your network SSID (name)
-//char pass[] = "PointHlubcickaPoint";        // your network password
-int status = WL_IDLE_STATUS;               // the Wifi radio's status
+//char pass[] = "";                         // your network password
+int status = WL_IDLE_STATUS;                // the Wifi radio's status
 
 //web
 char webserver[] = "www.miklik.cz";
