@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFiEsp.h>
 #include <PubSubClient.h>
+#include <DHT.h>
 
 // Emulate Serial1 on pins 6/7 if not present
 #ifndef HAVE_HWSERIAL1
@@ -11,6 +12,11 @@
 #endif
 
 #define BUILTIN_LED 13
+#define BUTTON_PIN 6
+#define DHTTYPE DHT11   // DHT 11
+#define DHTPIN 7
+
+DHT dht;
 
 //wifi
 #include <WifiAuth.h>                       // define ssid and pass bellow
@@ -20,10 +26,11 @@ int status = WL_IDLE_STATUS;                // the Wifi radio's status
 
 const char* mqtt_server = "7gya1l.messaging.internetofthings.ibmcloud.com";
 const int mqtt_port = 1883;
-const char* mqtt_clntid = "d:7gya1l:MQTTclient:atest1";
+const char* mqtt_clntid = "d:7gya1l:MQTTtest:Arduino001";
 const char* mqtt_event = "iot-2/evt/event1/fmt/json";
 const char* mqtt_user = "use-token-auth";
 const char* mqtt_auth = "TUZNgXdi2fy?FIvTpm";
+
 
 void callback(char* topic, byte* payload, unsigned int length) {
   // handle message arrived
@@ -35,6 +42,10 @@ PubSubClient client(mqtt_server,mqtt_port,callback, espClient);
 long lastMsg = 0;
 char msg[50];
 long int value = 0;
+unsigned long last_time = millis();
+unsigned long repeat_time = 300000;
+//unsigned long repeat_time = 15000;
+bool button_state = false;
 
 void setup_wifi()
 {
@@ -79,13 +90,18 @@ void setup_wifi()
 // }
 
 void setup(){
+  Serial.println("Start");
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
+  dht.setup(DHTPIN);
   Serial.begin(115200);
   Serial1.begin(19203);  // ESP must be set to the same speed AT+UART_DEF=9600,8,1,0,1
   // initialize ESP module
   setup_wifi();
   if (client.connect(mqtt_clntid, mqtt_user, mqtt_auth)) {
-    client.publish(mqtt_event,"{\"prop1\": \"Hello\",\"prop2\": \"world\",\"prop3\": \"ON\"}");
+    Serial.print("cln connected?");
+    Serial.println(client.connected());
+    //client.publish(mqtt_event,"{\"temp1\": \"22.0\",\"button1\": \"OFF\"}");
     //client.subscribe("inTopic");
   }
   //client.setServer(mqtt_server, mqtt_port);
@@ -119,6 +135,59 @@ void loop() {
      Serial.print("cln connected?");
      Serial.println(client.connected());
      reconnect();
+  } else
+  {
+    if(! digitalRead(BUTTON_PIN) && ! button_state)
+    {
+      button_state = true;
+      Serial.print("button1: ");
+      Serial.println(button_state);
+      //client.publish(mqtt_event,"{\"button1\": 1}");
+    }
+    if (last_time + repeat_time < millis() || button_state)
+    {
+      Serial.println(last_time);
+      Serial.println(last_time + repeat_time);
+      last_time = millis();
+      float h = dht.getHumidity();
+      float t = dht.getTemperature();
+      //String str_temp1 = "{\"temp1\":" + String(t) + "}";
+      //String str_humi1 = "{\"humi1\":" + String(h) + "}";
+      //int len_temp1 = str_temp1.length()+1;
+      //int len_humi1 = str_humi1.length()+1;
+      String str_mqtt = "{\"temp1\":" + String(t) + " ,\"humi1\":" + String(h) + " ,\"button1\":" + String(button_state) + "}";
+      int len_mqtt_pub = str_mqtt.length()+1;
+      char mqtt_pub[len_mqtt_pub];
+      str_mqtt.toCharArray(mqtt_pub,len_mqtt_pub);
+      //char mqtt_temp1[len_temp1];
+      //str_temp1.toCharArray(mqtt_temp1,len_temp1);
+      //char mqtt_humi1[len_humi1];
+      //str_humi1.toCharArray(mqtt_humi1,len_humi1);
+      // Serial.println("temp");
+      // Serial.println(t);
+      // Serial.println(len_temp1);
+      // Serial.println(str_temp1);
+      // Serial.println("humi");
+      // Serial.println(len_humi1);
+      // Serial.println(h);
+      // Serial.println(str_humi1);
+      Serial.println("mqtt");
+      Serial.println(len_mqtt_pub);
+      Serial.println(t);
+      Serial.println(h);
+      Serial.println(str_mqtt);
+
+      //client.publish(mqtt_event,mqtt_temp1);
+      //client.publish(mqtt_event,mqtt_humi1);
+      client.publish(mqtt_event,mqtt_pub);
+      //client.publish(mqtt_event,"{\"aaa\": 21, \"bbb\": \"23.00\", \"ccc\": 99.0}");
+      //client.publish(mqtt_event,str_temp1);
+      //client.publish(mqtt_event,str_humi1);
+      Serial.println(last_time);
+      //Serial.println("{\"temp1\": \"22.0\"}");
+      //Serial.println(digitalRead(BUTTON_PIN));
+    }
+    if(digitalRead(BUTTON_PIN)) button_state = false;
   }
   client.loop();
 
